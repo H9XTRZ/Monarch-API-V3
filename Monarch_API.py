@@ -347,13 +347,16 @@ def getHomePage(user: str, timeFrame: str): # MONTH/YEAR/ALL-TIME
         else:
             connectionStatus = "Online"
         settings = users[user]["settings"]
-
+        connectedAccount = users[user]["Connected_Account"]
+        Account_Balance = users[user]["Account_Balance"]
         return {
             "profit": profit,
             "todays_profit": todaysProfit,
             "trades": trades,
             "connectionStatus": connectionStatus,
-            "settings": settings
+            "connectedAccount": connectedAccount,
+            "Account_Balance": Account_Balance,
+            "settings": settings,
         }
     else:
         return {"status": "timeFrame not specified"}

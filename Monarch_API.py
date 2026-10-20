@@ -1,9 +1,8 @@
 from fastapi import FastAPI
 import uvicorn
-from typing import Dict
 import os
 import threading
-from pathlib import Path
+from persistence import StateStore, database_path
 import yfinance as yf
 import time
 from zoneinfo import ZoneInfo
@@ -20,6 +19,9 @@ users = {}
 VERSION = "V3"
 allOpenPositions = {}
 passwordToUser = {}
+store = StateStore(database_path(), users=users, passwordToUser=passwordToUser,
+                   allOpenPositions=allOpenPositions)
+print(f"Persistent storage: {store.path}", flush=True)
 adminKey = "ab93d7f953a0dc076a16b6a0"
 
 
@@ -74,18 +76,18 @@ def tradeDataAggregator():
     while True:
         if inOperationHours():
             if time.time() >= nextCheckTime:
-                for sym in allOpenPositions:
-                    # Get last 5 closes
-                    if not allOpenPositions[sym]:
-                        allOpenPositions[sym].extend(getLast5Closes(sym))
-                    else:
-                        close = getClose(sym)
-                        if close:
-                            # add current 5M candle
-                            allOpenPositions[sym].append(close)
+                with store.transaction():
+                    for sym in allOpenPositions:
+                        # Get last 5 closes
+                        if not allOpenPositions[sym]:
+                            allOpenPositions[sym].extend(getLast5Closes(sym))
+                        else:
+                            close = getClose(sym)
+                            if close:
+                                # add current 5M candle
+                                allOpenPositions[sym].append(close)
                 nextCheckTime = time.time()+ (60*5) # +5 min
-        else:
-            time.sleep(120)
+        time.sleep(1 if inOperationHours() else 120)
 
 
 
@@ -104,32 +106,33 @@ def daily_1202_checker():
         # Run once per day at the specified hour/minute in that timezone
         if now.hour == hour and now.minute == minute:
             if last_run_date != now.date():
-                # Organize chart
-                d,m,y = getDate()
-                if d != current_day:
+                with store.transaction():
+                    # Organize chart
+                    d,m,y = getDate()
+                    if d != current_day:
+                        for user in users:
+                            lastProfit = users[user]["CMP"][0]
+                            todaysProfit = users[user]["TodaysProfit"]
+                            users[user]["CMP"].append(lastProfit+todaysProfit)
+
+                    if m != current_month:
+                        for user in users:  # CYP
+                            lastProfit = users[user]["CYP"][0]
+                            currentMProfit = users[user]["CMP"][0]
+                            users[user]["CYP"].append(lastProfit+currentMProfit)
+                        for user in users:  # AP
+                            lastProfit = users[user]["AP"][0]
+                            currentAProfit = users[user]["CMP"][0]
+                            users[user]["AP"].append(lastProfit+currentAProfit)
+
+                        # Also clear trades at end of month
+                        for user in users:
+                            users[user]["trades"] = []
+
+                    # Clear running day info
                     for user in users:
-                        lastProfit = users[user]["CMP"][0]
-                        todaysProfit = users[user]["TodaysProfit"]
-                        users[user]["CMP"].append(lastProfit+todaysProfit)
-
-                if m != current_month:
-                    for user in users:  # CYP
-                        lastProfit = users[user]["CYP"][0]
-                        currentMProfit = users[user]["CMP"][0]
-                        users[user]["CYP"].append(lastProfit+currentMProfit)
-                    for user in users:  # AP
-                        lastProfit = users[user]["AP"][0]
-                        currentAProfit = users[user]["CMP"][0]
-                        users[user]["AP"].append(lastProfit+currentAProfit)
-
-                    # Also clear trades at end of month
-                    for user in users:
-                        users[user]["trades"] = []
-
-                # Clear running day info
-                for user in users:
-                    users[user]["TodaysProfit"] = 0.0
-                    users[user]["logs"] = []
+                        users[user]["TodaysProfit"] = 0.0
+                        users[user]["logs"] = []
 
                 print("organized chart", flush=True)
                 last_run_date = now.date()
@@ -152,8 +155,12 @@ def userExists(user):
 
 
 @app.get("/add-user")
+@store.endpoint
 def addUser(password: str, name: str):
     global users, passwordToUser
+
+    if password in users:
+        return {"status": "user already exists"}
 
     users[password] = {
         "Account_Balance": 0.0,
@@ -180,6 +187,7 @@ def addUser(password: str, name: str):
 
 
 @app.get("/remove-user")
+@store.endpoint
 def removeUser(user: str, key: str):
     global users
     if key != adminKey:
@@ -187,6 +195,7 @@ def removeUser(user: str, key: str):
     if user not in users:
         return {"status": "User not found"}
     del users[user]
+    passwordToUser.pop(user, None)
     return {"status": f"User {user} deleted"}
 
 
@@ -196,6 +205,7 @@ def removeUser(user: str, key: str):
 
 # ---------- Monarch Endpoints ---------- #
 @app.get("/update-logs")
+@store.endpoint
 def updateLogs(log: str, user: str):
     global users
     if userExists(user):
@@ -205,6 +215,7 @@ def updateLogs(log: str, user: str):
         return UNE
     
 @app.get("/update-current-progress") #
+@store.endpoint
 def updateCurrentStatus(progress: str, user: str):
     global users
     if progress:
@@ -214,6 +225,7 @@ def updateCurrentStatus(progress: str, user: str):
     return {"status": "updated"}
 
 @app.get("/update-schedule") #
+@store.endpoint
 def updateSchedule(time: str, description: str, user: str):
     global users
     users[user]["schedule"].append({time: description})
@@ -221,18 +233,21 @@ def updateSchedule(time: str, description: str, user: str):
 
 
 @app.post("/update-positions") #
+@store.endpoint
 def updatePositions(positions: dict, user: str):
     global users
     users[user]["positions"] = positions
     return {"status": "updated"}
 
 @app.get("/open-position") #
+@store.endpoint
 def openPosition(sym: str):
     global allOpenPositions
     allOpenPositions[sym] = []
     return {"status": "updated"}
 
 @app.get("/close-position") #
+@store.endpoint
 def closePosition(sym: str, profit: float, side: str, user: str):
     global users
     if not userExists(user):
@@ -250,6 +265,7 @@ def closePosition(sym: str, profit: float, side: str, user: str):
     return {"status": "updated"}
 
 @app.get("/ping") #
+@store.endpoint
 def Ping(user: str, version: str, connectedAccount: str, accountBalance: str):
     global users
     users[user]["Account_Balance"] = accountBalance
@@ -268,6 +284,7 @@ def Ping(user: str, version: str, connectedAccount: str, accountBalance: str):
 # -------- App Endpoints -------- #
 
 @app.get("/get-logs")
+@store.endpoint
 def getLogs(user: str):
     global users
     if userExists(user):
@@ -276,6 +293,7 @@ def getLogs(user: str):
 
 
 @app.get("/get-trade-page")
+@store.endpoint
 def getTradePage(user: str):
     global users
     if not userExists(user):
@@ -288,6 +306,7 @@ def getTradePage(user: str):
 
 
 @app.post("/update-settings")
+@store.endpoint
 def updatesSettings(user:str, newSettings: dict):
     if not userExists(user):
         return UNE
@@ -296,6 +315,7 @@ def updatesSettings(user:str, newSettings: dict):
     return {"status": "updating"}
 
 @app.get("/check-updated-settings-status")
+@store.endpoint
 def checkUpdatedSettingsStatus(user: str):
     if not userExists(user):
         return UNE
@@ -308,6 +328,7 @@ def checkUpdatedSettingsStatus(user: str):
 
 
 @app.get("/get-home-page")
+@store.endpoint
 def getHomePage(user: str, timeFrame: str): # MONTH/YEAR/ALL-TIME
     if not userExists(user):
         return UNE
@@ -340,6 +361,7 @@ def getHomePage(user: str, timeFrame: str): # MONTH/YEAR/ALL-TIME
 
 
 @app.get("/login")
+@store.endpoint
 def login(user: str):
     if userExists(user):
         return {"status": f"Hey, {passwordToUser[user]}"}

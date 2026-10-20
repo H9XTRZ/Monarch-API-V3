@@ -20,6 +20,7 @@ users = {}
 VERSION = "V3"
 allOpenPositions = {}
 passwordToUser = {}
+adminKey = "ab93d7f953a0dc076a16b6a0"
 
 
 UNE = {"status": "user does not exist"}
@@ -151,10 +152,10 @@ def userExists(user):
 
 
 @app.get("/add-user")
-def addUser(newUser: str, name: str):
+def addUser(password: str, name: str):
     global users, passwordToUser
 
-    users[newUser] = {
+    users[password] = {
         "Account_Balance": 0.0,
         "Connection_status": "Offline",
         "Version": "V3",
@@ -172,12 +173,21 @@ def addUser(newUser: str, name: str):
         "settings_applied": True,
         "lastPingTime": 0
     }
-    passwordToUser[newUser] = name
+    passwordToUser[password] = name
 
     return {"status": "added"}
 
 
 
+@app.get("/remove-user")
+def removeUser(user: str, key: str):
+    global users
+    if key != adminKey:
+        return {"status": "incorrect creds"}
+    if user not in users:
+        return {"status": "User not found"}
+    del users[user]
+    return {"status": f"User {user} deleted"}
 
 
 

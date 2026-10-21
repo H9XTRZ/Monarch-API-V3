@@ -255,7 +255,9 @@ def closePosition(sym: str, profit: float, side: str, user: str):
         return UNE
     plotPoints = allOpenPositions.get(sym, [])
     if sym in allOpenPositions:
-        del allOpenPositions[sym]        
+        del allOpenPositions[sym]     
+    if sym in users[user]["positions"]:
+        del users[user]["positions"][sym]
         
     users[user]["trades"].append(
         {sym: {
@@ -381,6 +383,7 @@ def clearUserTrades(user:str):
         return UNE
     users[user]["trades"] = []
     users[user]["TodaysProfit"] = 0.0
+    users[user]["positions"] = {}
     return {"status": "cleared"}
 
 

@@ -380,6 +380,7 @@ def clearUserTrades(user:str):
     if not userExists(user):
         return UNE
     users[user]["trades"] = []
+    users[user]["TodaysProfit"] = 0.0
     return {"status": "cleared"}
 
 

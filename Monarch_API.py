@@ -134,6 +134,7 @@ def daily_1202_checker():
                     for user in users:
                         users[user]["TodaysProfit"] = 0.0
                         users[user]["logs"] = []
+                    current_day, current_month, current_year = getDate()
 
                 print("organized chart", flush=True)
                 last_run_date = now.date()

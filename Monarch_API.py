@@ -366,7 +366,7 @@ def getHomePage(user: str, timeFrame: str): # MONTH/YEAR/ALL-TIME
             profit = users[user]["AP"]
         todaysProfit = users[user]["TodaysProfit"]
         trades = users[user]["trades"]
-        if users[user]["lastPingTime"]+30 < time.time():
+        if users[user]["lastPingTime"]+120 < time.time():
             connectionStatus = "Offline"
         else:
             connectionStatus = "Online"

@@ -424,3 +424,4 @@ if __name__ == "__main__":
 
 # Querei: http://127.0.0.1:8000/update-profit?value=1036.39871243?Aname=hiiii
 # Get: http://127.0.0.1:8000/total-profit
+

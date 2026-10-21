@@ -392,7 +392,7 @@ def getPlotPointStuff():
     global allOpenPositions
     return {"positions": allOpenPositions}
 
-endpoints = []
+endpoints = [] 
 for route in app.routes:
     hi = ["/openapi.json", "/docs", "/docs/oauth2-redirect", "/redoc"]
     if route.path not in hi:

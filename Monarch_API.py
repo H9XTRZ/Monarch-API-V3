@@ -223,6 +223,16 @@ def getPlotPointStuff():
     global allOpenPositions
     return {"positions": allOpenPositions}
 
+@app.get("/clear-schedule") #
+@store.endpoint
+def updateSchedule(user: str):
+    global users
+    if not userExists(user):
+        return UNE
+    users[user]["schedule"] = []
+    return {"status": "cleared"}
+
+
 
 # ---------- Monarch Endpoints ---------- #
 @app.get("/update-logs") #
@@ -245,26 +255,41 @@ def updateCurrentStatus(progress: str, user: str):
         users[user]["progress"].clear()
     return {"status": "updated"}
 
-@app.get("/update-schedule") #
+@app.post("/update-schedule") #
 @store.endpoint
-def updateSchedule(time: str, description: str, user: str):
+def updateSchedule(time: str, info: dict, user: str):
     global users
-    users[user]["schedule"].append({time: description})
+    users[user]["schedule"].append({time: info})
     return {"status": "updated"}
+"""
+New schedule format:
+
+{
+# For investigations
+    TIME:{
+        "Event": "INVESTIGATION",
+        "description": 
+    }
+
+# For orders
+    TIME:{
+        "Event": "ORDER",
+        "Purchase_Price": 120.82,
+        "Shares": 49,
+        "Side": "BUY"
+    }
+}
+
+"""
 
 
-@app.post("/update-positions") #
+@app.post("/open-position") #
 @store.endpoint
-def updatePositions(positions: dict, user: str):
-    global users
-    users[user]["positions"] = positions
-    return {"status": "updated"}
-
-@app.get("/open-position") #
-@store.endpoint
-def openPosition(sym: str):
-    global allOpenPositions
+def openPosition(sym: str, positions: dict, user: str):
+    """ Updated both data collecting and user positions """
+    global allOpenPositions, users
     allOpenPositions[sym] = []
+    users[user]["positions"] = positions
     return {"status": "updated"}
 
 

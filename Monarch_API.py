@@ -113,7 +113,8 @@ def daily_1202_checker():
                         for user in users:
                             lastProfit = users[user]["CMP"][0]
                             todaysProfit = users[user]["TodaysProfit"]
-                            users[user]["CMP"].append(lastProfit+todaysProfit)
+                            if todaysProfit >0:
+                                users[user]["CMP"].append(lastProfit+todaysProfit)
 
                     if m != current_month:
                         for user in users:  # CYP
@@ -204,7 +205,7 @@ def removeUser(user: str, key: str):
 
 
 # ---------- Monarch Endpoints ---------- #
-@app.get("/update-logs")
+@app.get("/update-logs") #
 @store.endpoint
 def updateLogs(log: str, user: str):
     global users

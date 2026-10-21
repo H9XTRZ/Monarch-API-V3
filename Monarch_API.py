@@ -246,6 +246,7 @@ def openPosition(sym: str):
     allOpenPositions[sym] = []
     return {"status": "updated"}
 
+
 @app.get("/close-position") #
 @store.endpoint
 def closePosition(sym: str, profit: float, side: str, user: str):

@@ -262,6 +262,7 @@ def closePosition(sym: str, profit: float, side: str, user: str):
             "side": side,
             "plot_points": plotPoints
         }})
+    users[user]["TodaysProfit"] += profit
     return {"status": "updated"}
 
 @app.get("/ping") #
@@ -370,6 +371,16 @@ def login(user: str):
         return {"status": f"Hey, {passwordToUser[user]}"}
     else:
         return UNE
+
+@app.get("/clear-user-trades")
+def clearUserTrades(user:str):
+    global users
+    if not userExists(user):
+        return UNE
+    users[user]["trades"] = []
+    return {"status": "cleared"}
+
+
 
 endpoints = []
 for route in app.routes:

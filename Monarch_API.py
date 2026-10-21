@@ -218,7 +218,7 @@ def updateLogs(log: str, user: str):
 @store.endpoint
 def updateCurrentStatus(progress: str, user: str):
     global users
-    if progress:
+    if progress != "COMPLETE":
         users[user]["progress"].append(progress)
     else:
         users[user]["progress"].clear()
@@ -386,7 +386,11 @@ def clearUserTrades(user:str):
     users[user]["positions"] = {}
     return {"status": "cleared"}
 
-
+@app.get("/get-plot-point-stuff")
+@store.endpoint
+def getPlotPointStuff():
+    global allOpenPositions
+    return {"positions": allOpenPositions}
 
 endpoints = []
 for route in app.routes:

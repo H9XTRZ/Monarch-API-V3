@@ -19,6 +19,7 @@ users = {}
 VERSION = "V3"
 allOpenPositions = {}
 passwordToUser = {}
+
 store = StateStore(database_path(), users=users, passwordToUser=passwordToUser,
                    allOpenPositions=allOpenPositions)
 print(f"Persistent storage: {store.path}", flush=True)
@@ -146,7 +147,9 @@ def daily_1202_checker():
 
 dataAggregatorThread = threading.Thread(target=tradeDataAggregator, daemon=True)
 dataAggregatorThread.start()
-print("Started data aggregator")
+daily1202CheckerThread = threading.Thread(target=daily_1202_checker, daemon=True)
+daily1202CheckerThread.start()
+print("Started background threads")
 
 
 
@@ -154,7 +157,7 @@ def userExists(user):
     global users
     return user in users
 
-
+# ---------- Admin Endpoints ---------- #
 
 @app.get("/add-user")
 @store.endpoint
@@ -202,7 +205,22 @@ def removeUser(user: str, key: str):
 
 
 
+@app.get("/clear-user-trades")
+@store.endpoint
+def clearUserTrades(user:str):
+    global users
+    if not userExists(user):
+        return UNE
+    users[user]["trades"] = []
+    users[user]["TodaysProfit"] = 0.0
+    users[user]["positions"] = {}
+    return {"status": "cleared"}
 
+@app.get("/get-plot-point-stuff")
+@store.endpoint
+def getPlotPointStuff():
+    global allOpenPositions
+    return {"positions": allOpenPositions}
 
 
 # ---------- Monarch Endpoints ---------- #
@@ -377,22 +395,7 @@ def login(user: str):
     else:
         return UNE
 
-@app.get("/clear-user-trades")
-@store.endpoint
-def clearUserTrades(user:str):
-    global users
-    if not userExists(user):
-        return UNE
-    users[user]["trades"] = []
-    users[user]["TodaysProfit"] = 0.0
-    users[user]["positions"] = {}
-    return {"status": "cleared"}
 
-@app.get("/get-plot-point-stuff")
-@store.endpoint
-def getPlotPointStuff():
-    global allOpenPositions
-    return {"positions": allOpenPositions}
 
 endpoints = [] 
 for route in app.routes:

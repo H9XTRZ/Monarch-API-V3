@@ -374,6 +374,7 @@ def login(user: str):
         return UNE
 
 @app.get("/clear-user-trades")
+@store.endpoint
 def clearUserTrades(user:str):
     global users
     if not userExists(user):

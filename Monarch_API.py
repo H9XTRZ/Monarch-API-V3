@@ -95,7 +95,7 @@ def tradeDataAggregator():
 
 def daily_1202_checker():
     global users, current_day, current_month, current_year
-    hour = 5
+    hour = 12
     minute = 2
     timeZone = "America/Chicago"
     last_run_date = None
@@ -264,7 +264,7 @@ def updateSchedule(time: str, info: dict, user: str):
 """
 New schedule format:
 
-{
+[
 # For investigations
     TIME:{
         "Event": "INVESTIGATION",
@@ -274,11 +274,12 @@ New schedule format:
 # For orders
     TIME:{
         "Event": "ORDER",
-        "Purchase_Price": 120.82,
-        "Shares": 49,
-        "Side": "BUY"
+        "Symbol": symbol
+        "Purchase_Price": fillPrice,
+        "Shares": shares,
+        "Side": side,
     }
-}
+]
 
 """
 

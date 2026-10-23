@@ -90,12 +90,43 @@ def tradeDataAggregator():
                 nextCheckTime = time.time()+ (60*5) # +5 min
         time.sleep(1 if inOperationHours() else 120)
 
+def dataOrganizer():
+    global users, current_day, current_month, current_year
+    with store.transaction():
+        # Organize chart
+        d,m,y = getDate()
+        if d != current_day:
+            for user in users:
+                lastProfit = users[user]["CMP"][0]
+                todaysProfit = users[user]["TodaysProfit"]
+                if todaysProfit >0:
+                    users[user]["CMP"].append(lastProfit+todaysProfit)
 
+        if m != current_month:
+            for user in users:  # CYP
+                lastProfit = users[user]["CYP"][0]
+                currentMProfit = users[user]["CMP"][0]
+                users[user]["CYP"].append(lastProfit+currentMProfit)
+            for user in users:  # AP
+                lastProfit = users[user]["AP"][0]
+                currentAProfit = users[user]["CMP"][0]
+                users[user]["AP"].append(lastProfit+currentAProfit)
+
+            # Also clear trades at end of month
+            for user in users:
+                users[user]["trades"] = []
+
+        # Clear running day info
+        for user in users:
+            users[user]["TodaysProfit"] = 0.0
+            users[user]["logs"] = []
+            users[user]["schedule"] = []
+        current_day, current_month, current_year = getDate()
 
 
 def daily_1202_checker():
     global users, current_day, current_month, current_year
-    hour = 12
+    hour = 5
     minute = 2
     timeZone = "America/Chicago"
     last_run_date = None
@@ -107,36 +138,7 @@ def daily_1202_checker():
         # Run once per day at the specified hour/minute in that timezone
         if now.hour == hour and now.minute == minute:
             if last_run_date != now.date():
-                with store.transaction():
-                    # Organize chart
-                    d,m,y = getDate()
-                    if d != current_day:
-                        for user in users:
-                            lastProfit = users[user]["CMP"][0]
-                            todaysProfit = users[user]["TodaysProfit"]
-                            if todaysProfit >0:
-                                users[user]["CMP"].append(lastProfit+todaysProfit)
-
-                    if m != current_month:
-                        for user in users:  # CYP
-                            lastProfit = users[user]["CYP"][0]
-                            currentMProfit = users[user]["CMP"][0]
-                            users[user]["CYP"].append(lastProfit+currentMProfit)
-                        for user in users:  # AP
-                            lastProfit = users[user]["AP"][0]
-                            currentAProfit = users[user]["CMP"][0]
-                            users[user]["AP"].append(lastProfit+currentAProfit)
-
-                        # Also clear trades at end of month
-                        for user in users:
-                            users[user]["trades"] = []
-
-                    # Clear running day info
-                    for user in users:
-                        users[user]["TodaysProfit"] = 0.0
-                        users[user]["logs"] = []
-                        users[user]["schedule"] = []
-                    current_day, current_month, current_year = getDate()
+                dataOrganizer()
 
                 print("organized chart", flush=True)
                 last_run_date = now.date()
@@ -159,6 +161,13 @@ def userExists(user):
     return user in users
 
 # ---------- Admin Endpoints ---------- #
+
+@app.get("/run-daily-clearer")
+@store.endpoint
+def runDailyClearer():
+    global users
+    dataOrganizer()
+    return {"status": "Complete"}
 
 @app.get("/add-user")
 @store.endpoint

@@ -162,12 +162,6 @@ def userExists(user):
 
 # ---------- Admin Endpoints ---------- #
 
-@app.get("/run-daily-clearer")
-def runDailyClearer():
-    global users
-    dataOrganizer()
-    return {"status": "Complete"}
-
 @app.get("/add-user")
 @store.endpoint
 def addUser(password: str, name: str):

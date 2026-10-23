@@ -163,7 +163,6 @@ def userExists(user):
 # ---------- Admin Endpoints ---------- #
 
 @app.get("/run-daily-clearer")
-@store.endpoint
 def runDailyClearer():
     global users
     dataOrganizer()

@@ -99,7 +99,7 @@ def dataOrganizer():
             for user in users:
                 lastProfit = users[user]["CMP"][0]
                 todaysProfit = users[user]["TodaysProfit"]
-                if todaysProfit >0:
+                if todaysProfit != 0:
                     users[user]["CMP"].append(lastProfit+todaysProfit)
 
         if m != current_month:

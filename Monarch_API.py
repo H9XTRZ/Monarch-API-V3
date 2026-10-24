@@ -97,24 +97,25 @@ def dataOrganizer():
         d,m,y = getDate()
         if d != current_day:
             for user in users:
-                lastProfit = users[user]["CMP"][0]
+                lastProfit = users[user]["CMP"][-1]
                 todaysProfit = users[user]["TodaysProfit"]
                 if todaysProfit != 0:
                     users[user]["CMP"].append(lastProfit+todaysProfit)
+                    lastAProfit = users[user]["AP"][-1]
+                    users[user]["AP"].append(lastAProfit+todaysProfit)
 
         if m != current_month:
             for user in users:  # CYP
-                lastProfit = users[user]["CYP"][0]
-                currentMProfit = users[user]["CMP"][0]
+                lastProfit = users[user]["CYP"][-1]
+                currentMProfit = users[user]["CMP"][-1]
                 users[user]["CYP"].append(lastProfit+currentMProfit)
-            for user in users:  # AP
-                lastProfit = users[user]["AP"][0]
-                currentAProfit = users[user]["CMP"][0]
-                users[user]["AP"].append(lastProfit+currentAProfit)
-
-            # Also clear trades at end of month
-            for user in users:
+                # Also clear trades at end of month
                 users[user]["trades"] = []
+                users[user]["CMP"].clear()
+
+        if y != current_year:
+            for user in users:
+                users[user]["CYP"].clear()
 
         # Clear running day info
         for user in users:
@@ -126,7 +127,7 @@ def dataOrganizer():
 
 def daily_1202_checker():
     global users, current_day, current_month, current_year
-    hour = 5
+    hour = 0
     minute = 2
     timeZone = "America/Chicago"
     last_run_date = None

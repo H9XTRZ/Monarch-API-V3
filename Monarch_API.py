@@ -236,6 +236,27 @@ def updateSchedule(user: str):
     return {"status": "cleared"}
 
 
+@app.post("/update-position-results")
+@store.endpoint
+def updatePositionResults(positionToUpdate: dict, newPositionInfo: dict, user: str):
+    # DO NOT USE TO UPDATE TRADES ON A PREVIOUS DAY
+    global users
+    if not userExists(user):
+        return UNE
+    if not positionToUpdate in users[user]["trades"]:
+        return {"status": "trade not found"}
+    oldPositionProfit = positionToUpdate[list(positionToUpdate)[0]]["profit"]
+    if oldPositionProfit < 0:
+        users[user]["TodaysProfit"] += abs(oldPositionProfit)
+    else:
+        users[user]["TodaysProfit"] -= oldPositionProfit
+    replaceIDX = users[user]["trades"].index(positionToUpdate)
+    users[user]["trades"][replaceIDX] = newPositionInfo
+    newProfit = newPositionInfo[list(newPositionInfo)[0]]["profit"]
+    users[user]["TodaysProfit"] += newProfit
+    return {"status": "updated"}
+
+
 
 # ---------- Monarch Endpoints ---------- #
 @app.get("/update-logs") #
@@ -317,6 +338,9 @@ def closePosition(sym: str, profit: float, side: str, user: str):
         }})
     users[user]["TodaysProfit"] += profit
     return {"status": "updated"}
+
+
+    
 
 @app.get("/ping") #
 @store.endpoint

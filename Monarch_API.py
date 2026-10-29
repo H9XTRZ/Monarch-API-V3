@@ -426,7 +426,9 @@ def getHomePage(user: str, timeFrame: str): # MONTH/YEAR/ALL-TIME
         if timeFrame == "MONTH":
             profit = users[user]["CMP"]
         elif timeFrame == "YEAR":
+            month_profit = users[user]["CMP"]
             profit = users[user]["CYP"]
+            profit += month_profit
         elif timeFrame == "ALL-TIME":
             profit = users[user]["AP"]
         todaysProfit = users[user]["TodaysProfit"]

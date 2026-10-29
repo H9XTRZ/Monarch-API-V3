@@ -257,6 +257,17 @@ def updatePositionResults(positionToUpdate: dict, newPositionInfo: dict, user: s
     return {"status": "updated"}
 
 
+@app.get("/reset-AT")
+@store.endpoint
+def reset_AT(user: str):
+    """ Resets AP to what ever the last CMP item is """
+    global users
+    if not userExists(user):
+        return UNE
+    users[user]["AP"].append(users[user]["CMP"][-1])
+    return {"status": "reset"}
+
+
 
 # ---------- Monarch Endpoints ---------- #
 @app.get("/update-logs") #

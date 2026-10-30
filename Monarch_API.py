@@ -59,7 +59,7 @@ def inOperationHours() -> bool:
 ### ---------- Threads -------- ###
 
 def getDate():
-    current_date = datetime.now()
+    current_date = datetime.now(ZoneInfo("America/Chicago"))
 
     current_day = current_date.day
     current_month = current_date.month
@@ -90,6 +90,43 @@ def tradeDataAggregator():
                 nextCheckTime = time.time()+ (60*5) # +5 min
         time.sleep(1 if inOperationHours() else 120)
 
+def dataOrgasm():
+    global users, current_day, current_month, current_year
+    with store.transaction():
+        # Organize chart
+        d,m,y = getDate()
+        if d != current_day:
+            for user in users:
+                lastProfit = users[user]["CMP"][-1]
+                todaysProfit = 208.61
+                if todaysProfit != 0:
+                    users[user]["CMP"].append(lastProfit+todaysProfit)
+                    lastAProfit = users[user]["AP"][-1]
+                    users[user]["AP"].append(lastAProfit+todaysProfit)
+
+        if m != current_month:
+            for user in users:  # CYP
+                lastProfit = users[user]["CYP"][-1]
+                currentMProfit = users[user]["CMP"][-1]
+                users[user]["CYP"].append(lastProfit+currentMProfit)
+                # Also clear trades at end of month
+                users[user]["trades"] = []
+                users[user]["CMP"].clear()
+
+        if y != current_year:
+            for user in users:
+                users[user]["CYP"].clear()
+
+        # Clear running day info
+        if d != current_day or m != current_month or y != current_year:
+            for user in users:
+                users[user]["TodaysProfit"] = 0.0
+                users[user]["logs"] = []
+                users[user]["schedule"] = []
+            current_day, current_month, current_year = getDate()
+
+dataOrgasm()
+
 def dataOrganizer():
     global users, current_day, current_month, current_year
     with store.transaction():
@@ -118,11 +155,12 @@ def dataOrganizer():
                 users[user]["CYP"].clear()
 
         # Clear running day info
-        for user in users:
-            users[user]["TodaysProfit"] = 0.0
-            users[user]["logs"] = []
-            users[user]["schedule"] = []
-        current_day, current_month, current_year = getDate()
+        if d != current_day or m != current_month or y != current_year:
+            for user in users:
+                users[user]["TodaysProfit"] = 0.0
+                users[user]["logs"] = []
+                users[user]["schedule"] = []
+            current_day, current_month, current_year = getDate()
 
 
 def daily_1202_checker():

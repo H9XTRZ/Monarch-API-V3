@@ -95,27 +95,16 @@ def dataOrgasm():
     with store.transaction():
         # Organize chart
         d,m,y = getDate()
-        if d != current_day:
-            for user in users:
-                lastProfit = users[user]["CMP"][-1]
-                todaysProfit = 208.61
-                if todaysProfit != 0:
-                    users[user]["CMP"].append(lastProfit+todaysProfit)
-                    lastAProfit = users[user]["AP"][-1]
-                    users[user]["AP"].append(lastAProfit+todaysProfit)
 
-        if m != current_month:
-            for user in users:  # CYP
-                lastProfit = users[user]["CYP"][-1]
-                currentMProfit = users[user]["CMP"][-1]
-                users[user]["CYP"].append(lastProfit+currentMProfit)
-                # Also clear trades at end of month
-                users[user]["trades"] = []
-                users[user]["CMP"].clear()
+        for user in users:
+            lastProfit = users[user]["CMP"][-1]
+            todaysProfit = 208.61
+            if todaysProfit != 0:
+                users[user]["CMP"].append(lastProfit+todaysProfit)
+                lastAProfit = users[user]["AP"][-1]
+                users[user]["AP"].append(lastAProfit+todaysProfit)
 
-        if y != current_year:
-            for user in users:
-                users[user]["CYP"].clear()
+
 
         # Clear running day info
         if d != current_day or m != current_month or y != current_year:

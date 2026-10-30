@@ -435,6 +435,7 @@ def getHomePage(user: str, timeFrame: str): # MONTH/YEAR/ALL-TIME
         trades = users[user]["trades"]
         if users[user]["lastPingTime"]+120 < time.time():
             connectionStatus = "Offline"
+            users[user]["progress"].clear() # Just in case if it goes offline and the progress isn't cleared
         else:
             connectionStatus = "Online"
         settings = users[user]["settings"]

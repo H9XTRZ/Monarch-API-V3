@@ -270,7 +270,14 @@ def reset_AT(user: str):
     users[user]["AP"].append(users[user]["CMP"][-1])
     return {"status": "reset"}
 
-
+@app.get("/set-last-CYP")
+@store.endpoint
+def set_last_CYP(user: str, lastItem: float):
+    global users
+    if not userExists(user):
+        return UNE
+    users[user]["CYP"] = [0, lastItem]
+    return {"status": "updated"}
 
 # ---------- Monarch Endpoints ---------- #
 @app.get("/update-logs") #

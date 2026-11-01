@@ -430,7 +430,7 @@ def getHomePage(user: str, timeFrame: str): # MONTH/YEAR/ALL-TIME
             profit = users[user]["CMP"]
         elif timeFrame == "YEAR":
             profit = users[user]["CYP"]
-            if profit[-1]:
+            if not profit[-1]:
                 month_profit = users[user]["CMP"][-1]
                 profit += month_profit
         elif timeFrame == "ALL-TIME":

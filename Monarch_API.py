@@ -156,13 +156,13 @@ def dataOrganizer(user, user_timezone):
                     users[user]["TodaysProfit"] = 0.0
                     users[user]["logs"] = []
                     users[user]["schedule"] = []
-                    users[user]["current_day"], users[user]["current_month"], users[user]["current_year"] = getDate(user_timezone)
 
                 # Auto Scale
                 if users[user]["Auto_Scale"] == True:
                     completed = Auto_Scale(user)
                     if not completed: # Disable auto scale due to account not being setup yet (shouldn't be possible but just in case)
                         users[user]["Auto_Scale"] = False
+                users[user]["current_day"], users[user]["current_month"], users[user]["current_year"] = getDate(user_timezone) # Update dates
                 return True
     except Exception:
         return False

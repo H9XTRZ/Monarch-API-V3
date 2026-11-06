@@ -26,6 +26,7 @@ store = StateStore(database_path(), users=users, passwordToUser=passwordToUser,
 print(f"Persistent storage: {store.path}", flush=True)
 adminKey = "ab93d7f953a0dc076a16b6a0"
 
+Max_Cap_Allocation = 2_000_000
 
 UNE = {"status": "user does not exist"}
 
@@ -97,7 +98,7 @@ def tradeDataAggregator():
 
 
 def Auto_Scale(user):
-    global users
+    global users, Max_Cap_Allocation
     try:
         Cap_pct = 0.33
         Res_pct = 0.06
@@ -108,6 +109,8 @@ def Auto_Scale(user):
         reserve = round(current_balance * Res_pct) # reserve
         current_balance -= reserve
         capital_allocation = round(current_balance*Cap_pct)
+        if capital_allocation > Max_Cap_Allocation:
+            capital_allocation = Max_Cap_Allocation
         if not users[user]["settings"]:
             return False
         users[user]["settings"]["HeadRoom"] = reserve
@@ -117,23 +120,6 @@ def Auto_Scale(user):
         print(f"Error occurred in auto scale for user: {user}: {e}", flush=True)
         return False
 
-
-
-
-
-    """
-    settings dict
-    {
-    "min_position_size": 50000,
-    "HeadRoom": 6000,
-    "Parallel_Trading": true,
-    "Status": "Active",
-    "Password": "4ff84cd5a7845a77",
-    "ID": "U19861945",
-    "Version": "V3"
-}
-    
-    """
 
 
 
@@ -267,6 +253,13 @@ def refresh_user_dicts():
 refresh_user_dicts() # Runs on startup
 
 # ---------- Admin Endpoints ---------- #
+
+@app.get("/get-user-dicts")
+def get_user_dicts(key: str):
+    global adminKey, users
+    if key != adminKey:
+        return {"status": "Invalid credentials"}
+    return users
 
 @app.get("/refresh-user-dicts")
 def run_refresh():

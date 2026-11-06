@@ -7,6 +7,7 @@ import yfinance as yf
 import time
 from zoneinfo import ZoneInfo
 from datetime import datetime, timezone, time as clock_time
+import copy
 
 app = FastAPI()
 
@@ -40,9 +41,13 @@ def getClose(sym):
                 return None
 
 def getLast5Closes(sym):
-    stock = yf.Ticker(sym)
-    data = stock.history(period="1d", interval="1m")
-    closes = data["Close"].tail(5).tolist()
+    try:
+        stock = yf.Ticker(sym)
+        data = stock.history(period="1d", interval="1m")
+        closes = data["Close"].tail(5).tolist()
+    except Exception as e:
+        print(f"Last 5 closes error: {e}")
+        return [0,0,0,0,0]
     return closes
 
 
@@ -58,15 +63,15 @@ def inOperationHours() -> bool:
 
 ### ---------- Threads -------- ###
 
-def getDate():
-    current_date = datetime.now(ZoneInfo("America/Chicago"))
+def getDate(user_timezone):
+    current_date = datetime.now(ZoneInfo(user_timezone))
 
     current_day = current_date.day
     current_month = current_date.month
     current_year = current_date.year
 
     return current_day, current_month, current_year
-current_day, current_month, current_year = getDate()
+
 
 
 
@@ -91,41 +96,91 @@ def tradeDataAggregator():
         time.sleep(1 if inOperationHours() else 120)
 
 
+def Auto_Scale(user):
+    global users
+    try:
+        Cap_pct = 0.33
+        Res_pct = 0.06
+        current_balance = users[user]["Account_Balance"]
+        current_balance = float(current_balance.removeprefix("$"))
+        if current_balance <= 0:
+            return False
+        reserve = round(current_balance * Res_pct) # reserve
+        current_balance -= reserve
+        capital_allocation = round(current_balance*Cap_pct)
+        if not users[user]["settings"]:
+            return False
+        users[user]["settings"]["HeadRoom"] = reserve
+        users[user]["settings"]["min_position_size"] = capital_allocation
+        return True
+    except Exception as e:
+        print(f"Error occurred in auto scale for user: {user}: {e}", flush=True)
+        return False
 
-def dataOrganizer():
-    global users, current_day, current_month, current_year
-    with store.transaction():
-        # Organize chart
-        d,m,y = getDate()
-        if d != current_day:
-            for user in users:
-                lastProfit = users[user]["CMP"][-1]
-                todaysProfit = users[user]["TodaysProfit"]
-                if todaysProfit != 0:
-                    users[user]["CMP"].append(lastProfit+todaysProfit)
-                    lastAProfit = users[user]["AP"][-1]
-                    users[user]["AP"].append(lastAProfit+todaysProfit)
 
-        if m != current_month:
-            for user in users:  # CYP
-                lastProfit = users[user]["CYP"][-1]
-                currentMProfit = users[user]["CMP"][-1]
-                users[user]["CYP"].append(lastProfit+currentMProfit)
-                # Also clear trades at end of month
-                users[user]["trades"] = []
-                users[user]["CMP"] = [0]
 
-        if y != current_year:
-            for user in users:
-                users[user]["CYP"] = [0]
 
-        # Clear running day info
-        if d != current_day or m != current_month or y != current_year:
-            for user in users:
-                users[user]["TodaysProfit"] = 0.0
-                users[user]["logs"] = []
-                users[user]["schedule"] = []
-            current_day, current_month, current_year = getDate()
+
+    """
+    settings dict
+    {
+    "min_position_size": 50000,
+    "HeadRoom": 6000,
+    "Parallel_Trading": true,
+    "Status": "Active",
+    "Password": "4ff84cd5a7845a77",
+    "ID": "U19861945",
+    "Version": "V3"
+}
+    
+    """
+
+
+
+
+def dataOrganizer(user, user_timezone):
+    global users
+    try: 
+        with store.transaction():
+
+                # Organize chart
+                d,m,y = getDate(user_timezone)
+                if d != users[user]["current_day"]:
+                    lastProfit = users[user]["CMP"][-1]
+                    todaysProfit = users[user]["TodaysProfit"]
+                    if todaysProfit != 0:
+                        users[user]["CMP"].append(lastProfit+todaysProfit)
+                        lastAProfit = users[user]["AP"][-1]
+                        users[user]["AP"].append(lastAProfit+todaysProfit)
+
+                if m != users[user]["current_month"]:
+                    # CYP
+                    lastProfit = users[user]["CYP"][-1]
+                    currentMProfit = users[user]["CMP"][-1]
+                    users[user]["CYP"].append(lastProfit+currentMProfit)
+                    # Also clear trades at end of month
+                    users[user]["trades"] = []
+                    users[user]["CMP"] = [0]
+
+                if y != users[user]["current_year"]:
+                    users[user]["CYP"] = [0]
+
+                # Clear running day info
+                if d != users[user]["current_day"] or m != users[user]["current_month"] or y != users[user]["current_year"]:
+                    users[user]["TodaysProfit"] = 0.0
+                    users[user]["logs"] = []
+                    users[user]["schedule"] = []
+                    users[user]["current_day"], users[user]["current_month"], users[user]["current_year"] = getDate(user_timezone)
+
+                # Auto Scale
+                if users[user]["Auto_Scale"] == True:
+                    completed = Auto_Scale(user)
+                    if not completed: # Disable auto scale due to account not being setup yet (shouldn't be possible but just in case)
+                        users[user]["Auto_Scale"] = False
+                return True
+    except Exception:
+        return False
+
 
 
 def daily_1202_checker():
@@ -154,8 +209,8 @@ def daily_1202_checker():
 
 dataAggregatorThread = threading.Thread(target=tradeDataAggregator, daemon=True)
 dataAggregatorThread.start()
-daily1202CheckerThread = threading.Thread(target=daily_1202_checker, daemon=True)
-daily1202CheckerThread.start()
+#daily1202CheckerThread = threading.Thread(target=daily_1202_checker, daemon=True)
+#daily1202CheckerThread.start()
 print("Started background threads")
 
 
@@ -164,17 +219,8 @@ def userExists(user):
     global users
     return user in users
 
-# ---------- Admin Endpoints ---------- #
-
-@app.get("/add-user")
-@store.endpoint
-def addUser(password: str, name: str):
-    global users, passwordToUser
-
-    if password in users:
-        return {"status": "user already exists"}
-
-    users[password] = {
+# Add new items to this dict then fun refresh user dicts
+user_format = {
         "Account_Balance": 0.0,
         "Connection_status": "Offline",
         "Version": "V3",
@@ -189,10 +235,63 @@ def addUser(password: str, name: str):
         "schedule": [],
         "trades": [],
         "settings": {},
+        "Auto_Scale": False,
         "settings_applied": True,
-        "lastPingTime": 0
+        "lastPingTime": 0,
+        "current_day": None,
+        "current_month": None,
+        "current_year": None,
+        "user_timezone": ""
     }
+
+@store.endpoint
+def refresh_user_dicts():
+    """ Checks contents of user_format and adds any missing items to user dicts """
+    global users, user_format
+    # Check to see if theres any thing to add
+    for user in users.copy():
+        info = users[user]
+        for i in user_format:
+            if i not in info:
+                term = user_format[i]
+                users[user][i] = copy.deepcopy(term) # add missing item to user dict
+    # Check if theres any items to remove
+    for user in users.copy():
+        info = users[user].copy()
+        for i in info:
+            if i not in user_format:
+                del users[user][i]
+
+            
+    
+refresh_user_dicts() # Runs on startup
+
+# ---------- Admin Endpoints ---------- #
+
+@app.get("/refresh-user-dicts")
+def run_refresh():
+    global users, user_format
+    refresh_user_dicts()
+    return {"status": "refreshed"}
+
+
+@app.get("/add-user")
+@store.endpoint
+def addUser(password: str, name: str, user_timezone: str):
+    global users, passwordToUser, user_format
+
+    if password in users:
+        return {"status": "user already exists"}
+
+    users[password] = copy.deepcopy(user_format)
     passwordToUser[password] = name
+    user_current_day, user_current_month, user_current_year = getDate(user_timezone)
+    if users[password]["current_day"] == None:
+        users[password]["current_day"] = user_current_day
+    if users[password]["current_month"] == None:
+        users[password]["current_month"] = user_current_month
+    if users[password]["current_year"] == None:
+        users[password]["current_year"] = user_current_year
 
     return {"status": "added"}
 
@@ -280,6 +379,20 @@ def set_last_CYP(user: str, lastItem: float):
     return {"status": "updated"}
 
 # ---------- Monarch Endpoints ---------- #
+
+@app.get("/run_EOD_tasks")
+def run_EOD_tasks(user: str, user_timezone: str):
+    if not userExists(user):
+        return UNE
+    complete = dataOrganizer(user, user_timezone)
+    if complete:
+        return {"status": "organized"}
+    else:
+        return {"status": "Error occurred in data organization"}
+    
+
+    
+
 @app.get("/update-logs") #
 @store.endpoint
 def updateLogs(log: str, user: str):
@@ -382,6 +495,35 @@ def Ping(user: str, version: str, connectedAccount: str, accountBalance: str):
 
 # -------- App Endpoints -------- #
 
+@app.get("/set-auto-scale")
+@store.endpoint
+def enable_Auto_Scale(user: str, value: bool):
+    global users
+    if not userExists(user):
+        return UNE
+    users[user]["Auto_Scale"] = value
+    return {"status": "updated"}
+
+
+@app.get("/set-user-timezone")
+@store.endpoint
+def set_user_endpoint(user: str, user_timezone: str):
+    global users
+    if not userExists(user):
+        return UNE
+    users[user]["user_timezone"] = user_timezone
+    user_current_day, user_current_month, user_current_year = getDate(user_timezone)
+    # Sets missing date info for each user in case it want already set up
+    if users[user]["current_day"] == None:
+        users[user]["current_day"] = user_current_day
+    if users[user]["current_month"] == None:
+        users[user]["current_month"] = user_current_month
+    if users[user]["current_year"] == None:
+        users[user]["current_year"] = user_current_year
+    return {"status": "updated"}
+    
+
+
 @app.get("/get-logs")
 @store.endpoint
 def getLogs(user: str):
@@ -457,6 +599,7 @@ def getHomePage(user: str, timeFrame: str): # MONTH/YEAR/ALL-TIME
             "connectionStatus": connectionStatus,
             "connectedAccount": connectedAccount,
             "Account_Balance": Account_Balance,
+            "Auto_Scale": users[user]["Auto_Scale"],
             "settings": settings,
         }
     else:

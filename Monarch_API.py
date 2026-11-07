@@ -1,4 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+import json
+import tempfile
+from pathlib import Path
 import uvicorn
 import os
 import threading
@@ -17,7 +20,6 @@ def root():
     return {"status": "ok"}
 
 users = {}
-VERSION = "V3"
 allOpenPositions = {}
 passwordToUser = {}
 
@@ -466,8 +468,58 @@ def closePosition(sym: str, profit: float, side: str, user: str):
     users[user]["TodaysProfit"] += profit
     return {"status": "updated"}
 
+SOFTWARE_FILES = {"Monarch_V3.py", "claude_runtime.py", "buy_sell.py", "trade_journal.py",
+                  "Cali_System_Prompt.txt", "WatchdogSystemPrompt.txt"}
+# This is beside the database, on Railway's persistent volume.
+software_update_path = store.path.parent / "software_update.json"
 
-    
+
+@app.post("/update-software")
+@store.endpoint
+def update_software(key: str, new_version: str, files: dict[str, str]):
+    if key != adminKey:
+        raise HTTPException(status_code=403, detail="Invalid credentials")
+    new_version = new_version.strip()
+    if not new_version or len(new_version) > 80 or set(files) != SOFTWARE_FILES:
+        raise HTTPException(status_code=400, detail="Provide a version, all four Python scripts, and both prompts")
+    for name, source in files.items():
+        if not source.strip():
+            raise HTTPException(status_code=400, detail=f"Empty script: {name}")
+        try:
+            if name.endswith(".py"):
+                compile(source, name, "exec")  # Check syntax without running uploaded code.
+        except (SyntaxError, ValueError) as error:
+            raise HTTPException(status_code=400, detail=f"Invalid Python in {name}: {error}")
+    release = {"version": new_version, "files": files}
+    if software_update_path.exists():
+        previous = json.loads(software_update_path.read_text(encoding="utf-8"))
+        if previous["version"] == new_version and previous != release:
+            raise HTTPException(status_code=409, detail="Use a new version when changing scripts")
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=software_update_path.parent,
+                                         delete=False) as f:
+            temporary = Path(f.name)
+            json.dump(release, f)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporary, software_update_path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    return {"status": "Updated", "version": new_version}
+
+
+@app.get("/check-for-updates")
+@store.endpoint
+def check_for_updates(user: str, local_version: str):
+    if not userExists(user):
+        return UNE
+    if software_update_path.exists():
+        release = json.loads(software_update_path.read_text(encoding="utf-8"))
+        if local_version != release["version"]:
+            return {"Update_Available": True, **release}
+    return {"Update_Available": False}
 
 @app.get("/ping") #
 @store.endpoint

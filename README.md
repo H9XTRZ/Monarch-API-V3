@@ -73,6 +73,74 @@ suits a small API, but each update serializes the full state. If data or traffic
 grows substantially, migrate to per-record database tables or PostgreSQL.
 The existing daily reset function remains unstarted, as in the original script.
 
+## Publishing Monarch software updates
+
+`POST /update-software` accepts the existing admin `key` and a `new_version`
+as query parameters. Its JSON body is a dictionary mapping these six filenames
+to their complete UTF-8 text contents:
+
+- `Monarch_V3.py`
+- `claude_runtime.py`
+- `buy_sell.py`
+- `trade_journal.py`
+- `Cali_System_Prompt.txt`
+- `WatchdogSystemPrompt.txt`
+
+The API validates the filenames, nonempty contents, and Python syntax without
+executing the upload. It saves the version and contents together in
+`software_update.json` beside `monarch.sqlite3`. On Railway this is
+`/data/software_update.json` when the volume is mounted at `/data`. There is no
+new database table, package, or storage service to configure. Keep the existing
+volume attached across deployments. The version is read from this file rather
+than a variable that resets when the API restarts.
+
+To enable updates:
+
+1. Deploy the updated `Monarch_API.py` to Railway. Confirm the API service has
+   its existing persistent volume mounted at `/data` and logs
+   `Persistent storage: /data/monarch.sqlite3`.
+2. On the Mac, set the device paths in the scripts being published to the
+   correct Jetson paths. Uploads install the exact source text; no path rewriting
+   is performed. Keep the configured runtime and prompt locations stable across
+   releases. The prompts are installed at the existing `CaliPromptPath` and
+   `WDPromptPath`; Python files go beside the running `Monarch_V3.py`.
+3. Install the updated `Monarch_Official/Monarch_V3.py` on the Jetson once,
+   while Monarch is stopped, so it has the new updater. Preserve the Jetson's
+   runtime JSON, `.env`, logs, and account settings.
+4. Run `Update Software.py` from the project root on the Mac. The six source
+   paths and API URL are at the top. Enter a new version such as `V3.1`, confirm
+   with `Y`, and enter the admin key. Optionally set `MONARCH_ADMIN_KEY` in the
+   publisher's environment to skip that last prompt. This is the API's existing
+   admin key, not a Monarch user password.
+5. Start/restart Monarch on the Jetson. Its startup check supplies its user
+   password as `user` and its saved version as `local_version` to
+   `GET /check-for-updates`. If the version differs, the response includes
+   `Update_Available: true`, `version`, and `files`.
+
+Monarch validates all six files first, stages them, and saves the previous files
+in `software_update_backup` beside its script. It replaces the files, updates
+only `Settings.Version` in the local runtime JSON, and restarts. A caught write
+failure restores files already replaced. An unavailable API or invalid release
+prints an update-skipped message and leaves Monarch running its installed version.
+If restoration itself fails, startup stops and identifies the backup directory.
+Backups contain the previous runtime data as well; keep them private.
+
+The check runs at startup, before trading threads start; it does not interrupt
+a running trading session when you publish. Use a different version for each
+changed release. Re-uploading the identical release is allowed after a connection
+timeout, but changing files under the same latest version is rejected. Version
+comparison is equality, not numeric ordering, as requested.
+
+The updater does not install new pip dependencies. Syntax validation cannot
+prove that a release will run correctly, and it does not automatically roll back
+application errors after restart. Retain the backup for manual recovery. File
+replacement is atomic per file, not across the entire set in a sudden power loss.
+
+Offline update tests live in the project root's `tests/test_software_updates.py`.
+Run `python -m unittest discover -s tests -p test_software_updates.py -v` from the
+project root. They use temporary files and a local test API, never the broker or
+the deployed Railway service.
+
 ## Railway references
 
 - [Using Volumes](https://docs.railway.com/volumes): creating/attaching volumes,

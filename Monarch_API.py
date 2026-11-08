@@ -28,7 +28,7 @@ store = StateStore(database_path(), users=users, passwordToUser=passwordToUser,
 print(f"Persistent storage: {store.path}", flush=True)
 adminKey = "ab93d7f953a0dc076a16b6a0"
 
-Max_Cap_Allocation = 2_000_000
+Max_Cap_Allocation = 1_000_000
 
 UNE = {"status": "user does not exist"}
 
